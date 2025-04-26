@@ -1,0 +1,19 @@
+# Ignore Python virtual environments
+.venv/
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore VSCode settings (optional)
+.vscode/
+
+# Ignore Jupyter Notebook checkpoints (if you use notebooks)
+.ipynb_checkpoints/
+
+# __pycache__ folders
+__pycache__/
+
+# Other common Python ignores
+*.pyc
+*.pyo
+*.pyd
