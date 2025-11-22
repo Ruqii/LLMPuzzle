@@ -1,0 +1,9 @@
+# Development
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Optional PNG icons (if you generate them)
+# icon-192.png
+# icon-512.png

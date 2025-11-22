@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>🕵️ Bot or Not - Find the AI!</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <h2>🕵️ Bot or Not - Chat Room</h2>
+
+        <!-- Display Assigned Chat ID -->
+        <div id="nicknameDisplay">Assigning your ID...</div>
+
+        <!-- Chat Messages -->
+        <div id="chatBox"></div>
+
+        <!-- Message Input -->
+        <input type="text" id="messageInput" placeholder="Type your message..." autocomplete="off" />
+
+        <!-- Voting Area (Always Visible) -->
+        <div id="votingArea">
+            <h3>🗳️ Vote for the AI</h3>
+            <div id="votingOptions">
+                <!-- Voting buttons will be dynamically inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Move JS to external file -->
+    <script src="/static/script.js"></script>
+</body>
+</html>

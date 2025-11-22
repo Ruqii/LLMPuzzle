@@ -10,6 +10,13 @@ from lifelines.statistics import logrank_test
 df = pd.read_csv('Raw_User_Activity_Dataset.csv')
 df.head()
 
+df.loc[df['event']==1, :]
+df.loc[:, ['event','user_id']]
+df.iloc[0,1] # first row, second column
+df.iloc[2] # third row
+df.iloc[4:8] # rows 4 to 7
+df.iloc[:, 0:2] # columns 0 to 1
+
 # set a cutoff date for right censored users
 date_cols = ['start_date', 'end_date', 'cutoff_date']
 df[date_cols] = df[date_cols].apply(pd.to_datetime, errors='coerce')
@@ -38,6 +45,7 @@ cph.print_summary()
 
 # predict hazard ratios
 cox_df['hazard_ratio'] = cph.predict_partial_hazard(cox_df)
+
 # predict survival probability over time
 surv_func = cph.predict_survival_function(cox_df)
 # rows: days over time
@@ -119,6 +127,7 @@ wb_df = wb_df[wb_df['duration'] > 0]  # Filter out non-positive durations
 aft = WeibullAFTFitter()
 aft.fit(wb_df, duration_col='duration', event_col='event')
 aft.print_summary()
+
 
 wb_df['predicted_lifetime'] = aft.predict_median(wb_df)
 wb_df['expected_lifetime'] = aft.predict_expectation(wb_df)

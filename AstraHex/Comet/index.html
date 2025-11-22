@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Comet Hexagram</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas resolution
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.scale(dpr, dpr);
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Configuration
+        const NUM_RINGS = 6;
+        const PATTERN = [1, 0, 1, 1, 0, 1]; // 1 = full circle (360°), 0 = stop at 315°
+        const MAX_ANGLE_FULL = Math.PI * 2; // 360 degrees
+        const MAX_ANGLE_GAP = 315 * Math.PI / 180; // 315 degrees (45° gap)
+
+        // Animation states
+        const STATE = {
+            IDLE: 'idle',
+            ORBITING: 'orbiting',
+            REVEALING: 'revealing'
+        };
+
+        let currentState = STATE.IDLE;
+        let isPressed = false;
+
+        // Ring configuration
+        const rings = [];
+        const baseRadius = 40;
+        const radiusIncrement = 35;
+        const orbitSpeed = 0.03; // radians per frame during orbiting
+        const revealSpeed = 0.02; // radians per frame during revealing
+
+        // Initialize rings
+        for (let i = 0; i < NUM_RINGS; i++) {
+            const targetAngle = PATTERN[i] === 1 ? MAX_ANGLE_FULL : MAX_ANGLE_GAP;
+            rings.push({
+                radius: baseRadius + (i * radiusIncrement),
+                angle: (Math.PI * 2 / NUM_RINGS) * i, // Current comet position
+                totalAngleTraveled: 0, // Cumulative angle traveled (starts at 0)
+                targetAngle: targetAngle, // Total distance to travel (360° or 315°)
+                pattern: PATTERN[i],
+                isComplete: false
+            });
+        }
+
+        // Get center coordinates
+        function getCenter() {
+            return {
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2
+            };
+        }
+
+        // Draw dim track (always visible)
+        function drawDimTrack(x, y, radius) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Draw comet with head and tail
+        function drawComet(x, y, angle, radius) {
+            const cometX = x + Math.cos(angle) * radius;
+            const cometY = y + Math.sin(angle) * radius;
+
+            // Tail (long fading trail behind the head)
+            const tailLengthPixels = 120; // Very long tail (120px)
+            const tailLength = tailLengthPixels / radius; // Convert to radians based on radius
+            const tailSegments = 40; // More segments for smoother, longer tail
+
+            for (let i = 0; i < tailSegments; i++) {
+                const t = i / tailSegments;
+                const tailAngle = angle - (tailLength * t);
+                const tailX = x + Math.cos(tailAngle) * radius;
+                const tailY = y + Math.sin(tailAngle) * radius;
+                const tailOpacity = (1 - t) * 0.7; // Fade from 0.7 to 0
+                const tailSize = 3.5 * (1 - t * 0.6); // Size tapers from 3.5 to ~1.4
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${tailOpacity})`;
+                ctx.beginPath();
+                ctx.arc(tailX, tailY, tailSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Head glow
+            const gradient = ctx.createRadialGradient(cometX, cometY, 0, cometX, cometY, 10);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.6)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(cometX, cometY, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head core (bright white)
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.beginPath();
+            ctx.arc(cometX, cometY, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw bright revealed arc from 0° to totalTraveled
+        // ONLY draws based on cumulative distance traveled - NO auto-fill
+        function drawRevealedArc(x, y, radius, totalTraveled, targetTotal) {
+            if (totalTraveled <= 0) return;
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+
+            // Draw from 0° to min(totalTraveled, targetTotal)
+            const endAngle = Math.min(totalTraveled, targetTotal);
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, endAngle);
+            ctx.stroke();
+        }
+
+        // Update animation
+        function update() {
+            if (currentState === STATE.ORBITING) {
+                rings.forEach(ring => {
+                    ring.angle += orbitSpeed;
+                });
+            } else if (currentState === STATE.REVEALING) {
+                rings.forEach(ring => {
+                    if (!ring.isComplete) {
+                        // Continue moving comet from current position
+                        ring.angle += revealSpeed;
+
+                        // Accumulate total angle traveled
+                        ring.totalAngleTraveled += revealSpeed;
+
+                        // Stop when totalAngleTraveled >= targetAngle
+                        // Rules: pattern 1 = 360° (2π), pattern 0 = 315° (5.497 rad)
+                        if (ring.totalAngleTraveled >= ring.targetAngle) {
+                            // Comet has traveled the required distance - STOP
+                            ring.isComplete = true;
+                        }
+                    }
+                });
+
+                // Stay in revealing state even when complete (no state change)
+            }
+        }
+
+        // Render
+        function render() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+            const center = getCenter();
+
+            // 1. Draw dim tracks (always in background)
+            rings.forEach(ring => {
+                drawDimTrack(center.x, center.y, ring.radius);
+            });
+
+            // 2. Draw comets (head + tail)
+            if (currentState !== STATE.IDLE) {
+                rings.forEach(ring => {
+                    drawComet(center.x, center.y, ring.angle, ring.radius);
+                });
+            }
+
+            // 3. Draw bright revealed arcs (only during revealing)
+            // Arc drawn from 0° to min(totalAngleTraveled, targetAngle)
+            if (currentState === STATE.REVEALING) {
+                rings.forEach(ring => {
+                    // Draw from 0° to cumulative traveled distance
+                    drawRevealedArc(
+                        center.x,
+                        center.y,
+                        ring.radius,
+                        ring.totalAngleTraveled,
+                        ring.targetAngle
+                    );
+                });
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            update();
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        // Event handlers
+        function handlePointerDown(e) {
+            e.preventDefault();
+            if (!isPressed && currentState === STATE.IDLE) {
+                isPressed = true;
+                currentState = STATE.ORBITING;
+            }
+        }
+
+        function handlePointerUp(e) {
+            e.preventDefault();
+            if (isPressed && currentState === STATE.ORBITING) {
+                isPressed = false;
+                currentState = STATE.REVEALING;
+
+                // Initialize revealing - reset cumulative tracking
+                rings.forEach(ring => {
+                    // Reset total angle traveled to 0
+                    ring.totalAngleTraveled = 0;
+                    ring.isComplete = false;
+                    // Comet continues from its current position (ring.angle unchanged)
+                });
+            }
+        }
+
+        // Attach event listeners
+        canvas.addEventListener('pointerdown', handlePointerDown);
+        canvas.addEventListener('pointerup', handlePointerUp);
+        canvas.addEventListener('pointercancel', handlePointerUp);
+        canvas.addEventListener('pointerleave', handlePointerUp);
+
+        // Prevent context menu on long press
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>

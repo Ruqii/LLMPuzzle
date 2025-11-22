@@ -1,0 +1,121 @@
+/* General Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Main Container */
+.chat-container {
+    width: 90%;
+    max-width: 400px;
+    background: #2c2c2c;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Chat Box */
+#chatBox {
+    width: 100%;
+    height: 300px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 5px;
+    padding: 10px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+/* Chat Messages */
+#chatBox p {
+    text-align: left;
+    margin: 5px 0;
+    padding: 6px 8px;
+    background: #444;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* Chat Closed State */
+.chat-closed {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+
+/* Message Input */
+#messageInput {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    margin-bottom: 15px;
+    background: #444;
+    color: #fff;
+}
+
+/* Voting Area */
+#votingArea {
+    width: 100%;
+    text-align: center;
+    margin-top: 10px;
+}
+
+/* Active Voting Highlight */
+#votingArea.active {
+    border: 2px dashed #4CAF50;
+    padding: 10px;
+    animation: pulse 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 5px #4CAF50; }
+    50% { box-shadow: 0 0 15px #4CAF50; }
+    100% { box-shadow: 0 0 5px #4CAF50; }
+}
+
+/* Voting Buttons */
+.vote-button {
+    padding: 10px 15px;
+    margin: 5px;
+    border: none;
+    border-radius: 5px;
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.vote-button:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+/* Headings */
+h2, h3 {
+    margin: 10px 0;
+    text-align: center;
+}
+
+/* Scrollbar Customization */
+#chatBox::-webkit-scrollbar {
+    width: 8px;
+}
+
+#chatBox::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+}

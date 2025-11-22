@@ -1,0 +1,12 @@
+{
+  "name": "Time Fingerprint",
+  "short_name": "TimePrint",
+  "description": "When you touch the silence, time breathes. The falling words gather into your fingerprint of time.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["entertainment", "lifestyle"],
+  "screenshots": []
+}
