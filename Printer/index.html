@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotoPager Note Printer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=VT323&display=swap');
+
+        :root {
+            --bg-color: #f0f2f5;
+            --body-color: #e8e4d9; /* 复古米色 */
+            --screen-bg: #111;
+            --screen-text: #e69500; /* 琥珀色文字 */
+            --btn-color: #c0392b; /* 复古红按钮 */
+            --paper-color: #fff;
+            --ink-color: #222;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier Prime', monospace;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* 整个舞台，用于放置拖出来的纸 */
+        #stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- 机器设计 --- */
+        .machine-container {
+            position: relative;
+            width: 380px;
+            height: 340px;
+            z-index: 10; /* 机器在中间层 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 机器外壳 */
+        .machine-body {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 280px;
+            background-color: var(--body-color);
+            border-radius: 30px;
+            box-shadow: 
+                0 20px 40px rgba(0,0,0,0.15),
+                inset 0 2px 5px rgba(255,255,255,0.8),
+                inset 0 -5px 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 20; /* 盖住未弹出的纸 */
+        }
+
+        /* 顶部出纸口缝隙 (视觉遮挡) */
+        .slot-cover {
+            position: absolute;
+            top: 45px; /* 调整缝隙位置 */
+            width: 280px;
+            height: 15px;
+            background: #d6d2c4;
+            border-radius: 10px;
+            box-shadow: inset 0 3px 5px rgba(0,0,0,0.2);
+            z-index: 5; /* 位于纸张之下，机器主体之上？不对，应该是纸张从这里出来 */
+        }
+        /* 修正层级逻辑：
+           Layer 1: 拖走的纸 (z-index 100)
+           Layer 2: Machine Body (z-index 20)
+           Layer 3: Current Paper (z-index 15)
+           Layer 4: Machine Back/Slot (z-index 10)
+        */
+
+        .brand {
+            font-family: 'VT323', monospace;
+            color: #888;
+            font-size: 14px;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        .brand span { color: var(--btn-color); font-weight: bold; }
+
+        /* 屏幕区域 */
+        .screen-frame {
+            width: 320px;
+            height: 100px;
+            background-color: var(--screen-bg);
+            border-radius: 15px;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .screen-cursor {
+            width: 10px;
+            height: 20px;
+            background: var(--screen-text);
+            animation: blink 1s infinite;
+            margin-right: 5px;
+        }
+
+        input[type="text"] {
+            background: transparent;
+            border: none;
+            color: var(--screen-text);
+            font-family: 'VT323', monospace;
+            font-size: 24px;
+            width: 100%;
+            outline: none;
+            caret-color: transparent; /* 使用自定义光标 */
+        }
+
+        /* 底部控制区 */
+        .controls {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .decorative-toggle {
+            display: flex;
+            gap: 10px;
+        }
+        .dot { width: 15px; height: 15px; border-radius: 50%; background: #ccc; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); }
+        .dot.red { background: #e74c3c; }
+        .dot.white { background: #fff; }
+
+        .print-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--btn-color);
+            border: none;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 
+                0 5px 10px rgba(0,0,0,0.3),
+                inset 0 2px 5px rgba(255,255,255,0.3),
+                inset 0 -2px 5px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+
+        .print-btn:active {
+            transform: scale(0.95);
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.3);
+        }
+        
+        .print-btn:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        /* --- 纸张设计 --- */
+        .paper-wrapper {
+            position: absolute;
+            /* 纸张容器位于机器中心，稍稍靠上，准备吐出 */
+            bottom: 250px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 260px;
+            z-index: 15; /* 在机器身体(20)下面，但在背景上面 */
+            perspective: 1000px;
+        }
+
+        .paper {
+            width: 260px;
+            min-height: 200px;
+            background: var(--paper-color);
+            padding: 20px;
+            box-sizing: border-box;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 14px;
+            color: var(--ink-color);
+            position: absolute;
+            bottom: 0; /* 初始状态，底部对齐容器底部，隐藏在机器里 */
+            transform-origin: bottom center;
+            transition: transform 0.5s ease-out; /* 默认过渡 */
+            cursor: default;
+        }
+
+        .paper.ready {
+            cursor: grab;
+        }
+        .paper.ready:active {
+            cursor: grabbing;
+        }
+
+        /* 纸张内容布局 */
+        .paper-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 10px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .paper-body {
+            font-size: 14px;
+            line-height: 1.5;
+            min-height: 60px;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .paper-footer {
+            border-top: 1px dashed #ddd;
+            padding-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stripes {
+            flex: 1;
+            height: 10px;
+            background: repeating-linear-gradient(
+                45deg,
+                #ddd,
+                #ddd 2px,
+                #fff 2px,
+                #fff 4px
+            );
+        }
+        
+        .footer-text {
+            font-size: 10px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        
+        .close-mark {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 12px;
+            color: #ccc;
+        }
+
+        /* 光标闪烁 */
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* 纸张升起动画类 */
+        .ejecting {
+            transition: bottom 0.2s ease-out;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="stage">
+        <div class="machine-container">
+            
+            <!-- 这里的 Wrapper 用于定位正在机器里的那张纸 -->
+            <div class="paper-wrapper" id="current-paper-slot">
+                <!-- 纸张通过 JS 动态插入 -->
+            </div>
+
+            <!-- 机器主体 -->
+            <div class="machine-body">
+                <div class="brand">Moto<span>Pager</span></div>
+                
+                <div class="screen-frame">
+                    <div class="screen-cursor"></div>
+                    <input type="text" id="input-text" placeholder="INPUT TEXT..." autocomplete="off" maxlength="80">
+                </div>
+
+                <div class="controls">
+                    <div class="decorative-toggle">
+                        <div class="dot red"></div>
+                        <div class="dot white"></div>
+                    </div>
+                    <button class="print-btn" onclick="printMessage()">PRINT</button>
+                </div>
+            </div>
+            
+            <!-- 遮挡层：让纸看起来是从缝隙里出来的 -->
+            <div class="slot-cover"></div>
+        </div>
+    </div>
+
+    <script>
+        const stage = document.getElementById('stage');
+        const slot = document.getElementById('current-paper-slot');
+        const input = document.getElementById('input-text');
+        const printBtn = document.querySelector('.print-btn');
+        
+        let currentPaper = null;
+        let isPrinting = false;
+
+        // 初始化：生成第一张空白纸
+        window.onload = () => {
+            loadNewPaper();
+        };
+
+        function generateID() {
+            return 'ID: ' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+
+        function getCurrentTime() {
+            const now = new Date();
+            return `${now.getMonth()+1}/${now.getDate()}, ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+        function createPaperElement() {
+            const div = document.createElement('div');
+            div.className = 'paper';
+            // 初始位置：完全藏在机器里 (向下偏移)
+            div.style.transform = 'translateY(100%)'; 
+            div.innerHTML = `
+                <div class="close-mark">×</div>
+                <div class="paper-header">
+                    <span>${generateID()}</span>
+                    <span>${getCurrentTime()}</span>
+                </div>
+                <div class="paper-body"></div>
+                <div class="paper-footer">
+                    <div class="stripes"></div>
+                    <div class="footer-text">End of Transmission</div>
+                </div>
+            `;
+            return div;
+        }
+
+        function loadNewPaper() {
+            // 创建新纸张
+            const newPaper = createPaperElement();
+            slot.appendChild(newPaper);
+            currentPaper = newPaper;
+
+            // 稍微延迟后露出一点点纸头 (Enter Animation)
+            setTimeout(() => {
+                newPaper.style.transform = 'translateY(85%)'; // 露出头部
+            }, 100);
+        }
+
+        function printMessage() {
+            const text = input.value;
+            if (!text || isPrinting || !currentPaper) return;
+
+            isPrinting = true;
+            input.disabled = true; // 锁定输入
+            printBtn.disabled = true;
+
+            const bodyEl = currentPaper.querySelector('.paper-body');
+            bodyEl.innerHTML = ''; // 清空（虽然是新纸，但为了保险）
+            
+            // 开始打字效果
+            let i = 0;
+            // 基础偏移量，随着字数增多，纸张向上移动 (translateY 减小)
+            let currentTranslateY = 85; 
+
+            function typeStep() {
+                if (i < text.length) {
+                    bodyEl.innerHTML += text.charAt(i);
+                    i++;
+                    
+                    // 模拟进纸：根据字数稍微向上推一点，或者每隔几个字推一下
+                    // 简单的逻辑：让纸张慢慢出来，最终完全展示
+                    // 我们根据进度 i / length 来计算目标 translateY
+                    
+                    // 目标是将 translateY 从 85% 变成 0% (或更小，取决于内容长度)
+                    // 这里我们简单做：打字过程中逐渐推出纸张
+                    const progress = i / text.length;
+                    // 最大推出位置：0% (完全展示)
+                    // 但如果字很少，我们至少要推出到能看到字的位置
+                    // 动态调整：每打一个字，检查高度，如果高度增加，就往上推
+                    
+                    // 简化版视觉效果：随着打字，纸张匀速升起
+                    const targetY = 85 - (progress * 85); // 最终变为 0%
+                    currentPaper.style.transform = `translateY(${targetY}%)`;
+
+                    setTimeout(typeStep, 50 + Math.random() * 50);
+                } else {
+                    finishPrinting();
+                }
+            }
+            typeStep();
+        }
+
+        function finishPrinting() {
+            isPrinting = false;
+            input.disabled = false;
+            printBtn.disabled = false;
+            input.value = ''; // 清空输入框
+            input.focus();
+
+            // 打印完成，纸张完全弹出
+            currentPaper.style.transform = 'translateY(-20px)'; // 稍微多吐出来一点，表示完成
+            currentPaper.classList.add('ready'); // 允许拖拽
+
+            // 绑定拖拽事件到这张纸上
+            initDrag(currentPaper);
+        }
+
+        // --- 拖拽逻辑 ---
+        function initDrag(paperEl) {
+            let isDragging = false;
+            let startX, startY;
+            let initialLeft, initialTop;
+            
+            paperEl.addEventListener('mousedown', startDrag);
+
+            function startDrag(e) {
+                // 只有 Ready 状态的纸才能拖动
+                if (!paperEl.classList.contains('ready')) return;
+
+                isDragging = true;
+                
+                // 1. 状态转换：从 slot 中取出，放到 stage (body) 层级
+                // 获取当前纸张相对于视口的绝对位置
+                const rect = paperEl.getBoundingClientRect();
+                
+                // 为了能拖出机器，必须改变 DOM 结构或定位方式
+                // 我们把纸张 append 到 body (或者 stage)，并设置为 absolute
+                // 保留当前的视觉位置不变
+                paperEl.style.transform = 'none'; // 移除之前的 translateY
+                paperEl.style.width = rect.width + 'px';
+                paperEl.style.left = rect.left + 'px';
+                paperEl.style.top = rect.top + 'px';
+                paperEl.style.position = 'fixed'; // 使用 fixed 避免父容器 overflow 限制
+                paperEl.style.zIndex = 1000; // 最顶层
+                
+                document.body.appendChild(paperEl); // 移动 DOM 节点
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = rect.left;
+                initialTop = rect.top;
+
+                paperEl.style.cursor = 'grabbing';
+                
+                // 全局监听移动
+                window.addEventListener('mousemove', onDrag);
+                window.addEventListener('mouseup', endDrag);
+            }
+
+            function onDrag(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                paperEl.style.left = `${initialLeft + dx}px`;
+                paperEl.style.top = `${initialTop + dy}px`;
+            }
+
+            function endDrag(e) {
+                if (!isDragging) return;
+                isDragging = false;
+                paperEl.style.cursor = 'default'; // 拖完后不再是手型，或者保持 grab
+                
+                // 移除监听
+                window.removeEventListener('mousemove', onDrag);
+                window.removeEventListener('mouseup', endDrag);
+
+                // 2. 检查是否移出了机器区域（简单的判断：只要拖动结束了，就视为移走了）
+                // 触发重新加载新纸
+                // 为了防止原地点击也触发，可以判断一下移动距离，或者简单地只要拖拽结束就加载新纸
+                if (paperEl === currentPaper) {
+                    currentPaper = null; // 当前机器里没纸了
+                    setTimeout(loadNewPaper, 500); // 0.5秒后吐出新纸
+                }
+                
+                // 拖走的纸稍微旋转一点，增加自然感
+                const randomRot = (Math.random() - 0.5) * 10;
+                paperEl.style.transition = 'transform 0.3s';
+                paperEl.style.transform = `rotate(${randomRot}deg)`;
+            }
+        }
+
+        // 回车键打印
+        input.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') printMessage();
+        });
+
+    </script>
+</body>
+</html>
