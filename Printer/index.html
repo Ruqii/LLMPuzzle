@@ -114,11 +114,13 @@
         }
 
         .screen-cursor {
+            position: absolute;
             width: 10px;
             height: 20px;
             background: var(--screen-text);
             animation: blink 1s infinite;
-            margin-right: 5px;
+            pointer-events: none;
+            left: 20px; /* 初始位置 */
         }
 
         input[type="text"] {
@@ -130,6 +132,7 @@
             width: 100%;
             outline: none;
             caret-color: transparent; /* 使用自定义光标 */
+            position: relative;
         }
 
         /* 底部控制区 */
@@ -315,9 +318,32 @@
         const slot = document.getElementById('current-paper-slot');
         const input = document.getElementById('input-text');
         const printBtn = document.querySelector('.print-btn');
-        
+        const screenCursor = document.querySelector('.screen-cursor');
+
         let currentPaper = null;
         let isPrinting = false;
+
+        // 光标跟随逻辑
+        function updateCursorPosition() {
+            // 创建一个隐藏的 span 来测量文字宽度
+            const measureSpan = document.createElement('span');
+            measureSpan.style.font = '24px VT323, monospace';
+            measureSpan.style.visibility = 'hidden';
+            measureSpan.style.position = 'absolute';
+            measureSpan.style.whiteSpace = 'pre';
+            measureSpan.textContent = input.value;
+            document.body.appendChild(measureSpan);
+
+            const textWidth = measureSpan.offsetWidth;
+            document.body.removeChild(measureSpan);
+
+            // 更新光标位置 (20px 是 padding)
+            screenCursor.style.left = (20 + textWidth) + 'px';
+        }
+
+        // 监听输入事件
+        input.addEventListener('input', updateCursorPosition);
+        input.addEventListener('focus', updateCursorPosition);
 
         // 初始化：生成第一张空白纸
         window.onload = () => {
@@ -414,6 +440,7 @@
             input.disabled = false;
             printBtn.disabled = false;
             input.value = ''; // 清空输入框
+            updateCursorPosition(); // 重置光标位置
             input.focus();
 
             // 打印完成，纸张完全弹出
