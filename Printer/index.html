@@ -447,6 +447,7 @@
                 // 保留当前的视觉位置不变
                 paperEl.style.transform = 'none'; // 移除之前的 translateY
                 paperEl.style.width = rect.width + 'px';
+                paperEl.style.height = rect.height + 'px';
                 paperEl.style.left = rect.left + 'px';
                 paperEl.style.top = rect.top + 'px';
                 paperEl.style.position = 'fixed'; // 使用 fixed 避免父容器 overflow 限制
